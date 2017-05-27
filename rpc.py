@@ -10,13 +10,59 @@ class MRPCError(Exception):
     pass
 
 
+class MRPCCredential(object):
+
+    TYPES = {"MAK_CREDENTIAL": ("mak", ),
+             "WEB_CREDENTIAL": ("username", "password", "unit_name")}
+
+    def __init__(self, cred_type, **kwargs):
+        if cred_type not in MRPCCredential.TYPES:
+            raise ValueError("cred_type must be one of the keys in MRPCCredential.TYPES.")
+        self.__cred_type = cred_type
+        self.__mak = None
+        self.__username = None
+        self.__password = None
+        self.__unit_name = None
+        for param in MRPCCredential.TYPES[cred_type]:
+            if param not in kwargs:
+                raise ValueError('{} is required for {} types.'.format(param, cred_type))
+        if cred_type == "MAK_CREDENTIAL":
+            self.__mak = kwargs["mak"]
+        else:
+            self.__username = kwargs["username"]
+            self.__password = kwargs["password"]
+            self.__unit_name = kwargs["unit_name"]
+
+    @property
+    def cred_type(self):
+        return self.__cred_type
+
+    @property
+    def unit_name(self):
+        return self.__unit_name
+
+    def payload(self):
+        if self.__cred_type == "MAK_CREDENTIAL":
+            return {"credential": {"type": "makCredential", "key": self.__mak}}
+        else:
+            return {"credential": {"type": "mmaCredential", "username": self.__username, "password": self.__password}}
+
+    @staticmethod
+    def new_mak(mak):
+        return MRPCCredential("MAK_CREDENTIAL", mak=mak)
+
+    @staticmethod
+    def new_web(username, password, unit_name):
+        return MRPCCredential("WEB_CREDENTIAL", username=username, password=password, unit_name=unit_name)
+
+
 class SocketMaker(object):
 
-    def __init__(self, cert_path, password):
+    def __init__(self, cert_path, cert_password):
         self.ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         self.ctx.check_hostname = False
         self.ctx.verify_mode = ssl.CERT_NONE
-        self.ctx.load_cert_chain(cert_path, password=password)
+        self.ctx.load_cert_chain(cert_path, password=cert_password)
 
     def get_socket(self):
         s = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
@@ -30,9 +76,9 @@ class MRPCSession(object):
     schema_version = "17"
     proto_pat = re.compile("^.*MRPC/2 (?P<h_size>\d+) (?P<b_size>\d+)\r\n")
 
-    def __init__(self, socket_maker, address, mak, port=1413, debug=False):
+    def __init__(self, socket_maker, address, credential, port=1413, debug=False):
         self.sm = socket_maker
-        self.mak = mak
+        self.credential = credential
         self.address = address
         self.port = port
         self.socket = None
@@ -44,17 +90,27 @@ class MRPCSession(object):
     def connect(self):
         self.socket = self.sm.get_socket()
         self.socket.connect((self.address, self.port))
-        if not self.do_auth():
-            self.socket.shutdown()
-            self.socket.close()
-            self.socket = None
+        h, b = self.do_auth()
+        if 'status' not in b or b["status"] != "success":
+            import pprint; pprint.pprint(b); pprint.pprint(self.credential.payload())
+            self.close()
             raise MRPCError("Auth Failure")
-        self.send_request("bodyConfigSearch", {"bodyId": "-"})
-        h, r = self.get_response()
-        try:
-            self.body_id = r['bodyConfig'][0]['bodyId']
-        except KeyError:
-            self.body_id = "-"
+        if self.credential.cred_type == "WEB_CREDENTIAL":
+            try:
+                devices = [d for d in b["deviceId"] if d["friendlyName"] == self.credential.unit_name]
+                if len(devices) > 0:
+                    self.body_id = devices[0]["id"]
+                else:
+                    raise KeyError("No device entry matching unit_name.")
+            except KeyError:
+                self.body_id = "-"
+        else:
+            self.send_request("bodyConfigSearch", {"bodyId": "-"})
+            h, r = self.get_response()
+            try:
+                self.body_id = r['bodyConfig'][0]['bodyId']
+            except KeyError:
+                self.body_id = "-"
 
     def close(self):
         if self.socket is not None:
@@ -117,11 +173,10 @@ class MRPCSession(object):
         return headers, response_json
 
     def do_auth(self):
-        payload_json = {"credential": {"type": "makCredential", "key": self.mak}}
-        self.send_request("bodyAuthenticate", payload_json)
-        h, r = self.get_response()
+        self.send_request("bodyAuthenticate", self.credential.payload())
+        h, b = self.get_response()
         try:
-            return r["status"]
+            return h, b
         except KeyError:
             pass
         raise MRPCError("Auth Error, No Auth Status Response.")
@@ -131,10 +186,30 @@ class MRPCSession(object):
         return date_time.strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
-    def new_session(cert_path, password, address, mak, port=1413, debug=False):
-        sm = SocketMaker(cert_path=cert_path, password=password)
+    def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
+        sm = SocketMaker(cert_path=cert_path, cert_password=cert_password)
         return MRPCSession(socket_maker=sm,
                            address=address,
-                           mak=mak,
+                           credential=credential,
                            port=port,
                            debug=debug)
+
+    @staticmethod
+    def new_local_session(cert_path, cert_password, address, mak, port=1413, debug=False):
+        cred = MRPCCredential.new_mak(mak=mak)
+        return MRPCSession.new_session(cert_path=cert_path,
+                                       cert_password=cert_password,
+                                       address=address,
+                                       credential=cred,
+                                       port=port,
+                                       debug=debug)
+
+    @staticmethod
+    def new_web_session(cert_path, cert_password, username, password, unit_name, debug=False):
+        cred = MRPCCredential.new_web(username=username, password=password, unit_name=unit_name)
+        return MRPCSession.new_session(cert_path=cert_path,
+                                       cert_password=cert_password,
+                                       address="middlemind.tivo.com",
+                                       credential=cred,
+                                       port=443,
+                                       debug=debug)

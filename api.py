@@ -112,21 +112,21 @@ class Mind(object):
         payload['levelOfDetail'] = level_of_detail
         return self._get_paged_response("contentSearch", payload, "content", 20)
 
-    def collection_search(self, filt=None, level_of_detail="medium"):
+    def collection_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
         payload['bodyId'] = self.session.body_id
         payload['levelOfDetail'] = level_of_detail
         payload['omitPgdImages'] = True
-        return self._get_paged_response("collectionSearch", payload, "collection", 20)
+        return self._get_paged_response("collectionSearch", payload, "collection", 20, limit=limit)
 
     @staticmethod
     def new_session(cert_path, password, address, mak, port=1413, debug=False):
         mrpc = rpc.MRPCSession.new_session(cert_path=cert_path,
-                                           password=password,
+                                           cert_password=password,
                                            address=address,
-                                           mak=mak,
+                                           credential=mak,
                                            port=port,
                                            debug=debug)
         mrpc.connect()
