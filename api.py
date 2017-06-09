@@ -1,5 +1,6 @@
 import copy
-from pprint import pprint
+import contextlib
+import threading
 
 import tivotalk.mind.rpc as rpc
 
@@ -60,7 +61,6 @@ class Mind(object):
 
     def __init__(self, session):
         self.session = session
-        # self.session = rpc.TiVoRPCSession()
 
     def _get_paged_response(self, req_type, payload, target_array, page_size=20, limit=None):
         results = []
@@ -122,12 +122,69 @@ class Mind(object):
         return self._get_paged_response("collectionSearch", payload, "collection", 20, limit=limit)
 
     @staticmethod
-    def new_session(cert_path, password, address, mak, port=1413, debug=False):
+    def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
         mrpc = rpc.MRPCSession.new_session(cert_path=cert_path,
-                                           cert_password=password,
+                                           cert_password=cert_password,
                                            address=address,
-                                           credential=mak,
+                                           credential=credential,
                                            port=port,
                                            debug=debug)
         mrpc.connect()
-        return mrpc
+        return Mind(session=mrpc)
+
+    @staticmethod
+    def new_local_session(cert_path, cert_password, address, mak, port=1413, debug=False):
+        mrpc = rpc.MRPCSession.new_local_session(cert_path=cert_path,
+                                                 cert_password=cert_password,
+                                                 address=address,
+                                                 mak=mak,
+                                                 port=port,
+                                                 debug=debug)
+        mrpc.connect()
+        return Mind(session=mrpc)
+
+
+class MindManager(object):
+
+    def __init__(self, cert_path, cert_password, address, credential,
+                 port=1413, debug=False, timeout=120):
+        self.__cert_path = cert_path
+        self.__cert_password = cert_password
+        self.__address = address
+        self.__credential = credential
+        self.__port = port
+        self.__debug = debug
+        self.__timeout = timeout
+        self.__mind = None
+        self.__timer = None
+        pass
+
+    def disconnect(self):
+        try:
+            self.__mind.session.close()
+        except AttributeError:
+            pass
+        finally:
+            self.__mind = None
+        if threading.current_thread().getName() == threading.main_thread().getName():
+            try:
+                self.__timer.cancel()
+            except AttributeError:
+                pass
+            finally:
+                self.__timer = None
+
+    @contextlib.contextmanager
+    def mind(self):
+        if self.__timer is not None:
+            self.__timer.cancel()
+            self.__timer = None
+        if self.__mind is None:
+            self.__mind = Mind.new_session(cert_path=self.__cert_path,
+                                           cert_password=self.__cert_password,
+                                           address=self.__address,
+                                           credential=self.__credential,
+                                           port=self.__port,
+                                           debug=self.__debug)
+        yield self.__mind
+        self.__timer = threading.Timer(self.__timeout, self.disconnect)
