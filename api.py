@@ -53,6 +53,36 @@ class SearchFilter(object):
     def order_by(self, sort_field):
         self.dict['orderBy'] = sort_field
 
+    def set_level_of_detail(self, level_of_detail=None):
+        if level_of_detail is None:
+            try:
+                del self.dict['levelOfDetail']
+            except KeyError:
+                pass
+        elif 'responseTemplate' in self.dict:
+            raise ValueError('level_of_detail and response_template are conflicting options.  Clear response '
+                             'templates before setting level of detail.')
+        else:
+            self.dict['levelOfDetail'] = level_of_detail
+
+    def set_response_template(self, template_list=None):
+        if template_list is None:
+            try:
+                del self.dict['responseTemplate']
+            except KeyError:
+                pass
+        elif 'levelOfDetail' in self.dict:
+            raise ValueError('level_of_detail and response_template are conflicting options.  Clear level of '
+                             'detail before setting response templates.')
+        else:
+            self.dict['responseTemplate'] = template_list[:]
+
+    def pop(self, key, *args):
+        return self.dict.pop(key, *args)
+
+    def setdefault(self, key, default=None):
+        return self.dict.setdefault(key, default)
+
     def get_payload(self):
         return copy.copy(self.dict)
 
@@ -69,7 +99,7 @@ class Mind(object):
         h, b = self.session.get_response()
         while target_array in b and len(b[target_array]) > 0:
             results.extend(b[target_array])
-            if limit is not None and len(results) > limit:
+            if (limit is not None and len(results) > limit) or ('isBottom' in b and b['isBottom']):
                 break
             if 'count' in payload:
                 del payload['count']
@@ -78,39 +108,39 @@ class Mind(object):
             h, b = self.session.get_response()
         return results
 
-    def recording_folder_item_search(self, filt=None, level_of_detail="medium"):
+    def recording_folder_item_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
         payload.update({'bodyId': self.session.body_id,
                         'levelOfDetail': level_of_detail,
                         'flatten': True})
-        return self._get_paged_response("recordingFolderItemSearch", payload, "recordingFolderItem", 20)
+        return self._get_paged_response("recordingFolderItemSearch", payload, "recordingFolderItem", 20, limit=limit)
 
-    def recording_search(self, filt=None, level_of_detail="medium"):
+    def recording_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
         payload.update({'bodyId': self.session.body_id,
                         'levelOfDetail': level_of_detail,
                         'state': ['inProgress', 'scheduled']})
-        return self._get_paged_response("recordingSearch", payload, "recording", 20)
+        return self._get_paged_response("recordingSearch", payload, "recording", 20, limit=limit)
 
-    def offer_search(self, filt=None, level_of_detail="medium"):
+    def offer_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
         payload['bodyId'] = self.session.body_id
         payload['levelOfDetail'] = level_of_detail
-        return self._get_paged_response("offerSearch", payload, "offer", 20)
+        return self._get_paged_response("offerSearch", payload, "offer", 20, limit=limit)
 
-    def content_search(self, filt=None, level_of_detail="medium"):
+    def content_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
         payload['bodyId'] = self.session.body_id
         payload['levelOfDetail'] = level_of_detail
-        return self._get_paged_response("contentSearch", payload, "content", 20)
+        return self._get_paged_response("contentSearch", payload, "content", 20, limit=limit)
 
     def collection_search(self, filt=None, level_of_detail="medium", limit=None):
         payload = filt if filt is not None else {}
