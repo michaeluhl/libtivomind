@@ -16,6 +16,9 @@ class SearchFilter(object):
             key += "Keyword"
         self.dict[key] = value
 
+    def by_keyword(self, keyword):
+        self.dict['keyword'] = keyword
+
     def by_title(self, title, exact_match=False):
         self.by_keywordable('title', title, exact_match)
 
@@ -89,8 +92,9 @@ class SearchFilter(object):
 
 class Mind(object):
 
-    def __init__(self, session):
+    def __init__(self, session, level_of_detail="medium"):
         self.session = session
+        self.level_of_detail = level_of_detail
 
     def _get_paged_response(self, req_type, payload, target_array, page_size=20, limit=None):
         results = []
@@ -108,48 +112,59 @@ class Mind(object):
             h, b = self.session.get_response()
         return results
 
-    def recording_folder_item_search(self, filt=None, level_of_detail="medium", limit=None):
+    def _prepare_search(self, search_type, result_type, filt=None, options=None, page_size=20, limit=None):
         payload = filt if filt is not None else {}
+        updates = options if options is not None and isinstance(options, dict) else {}
         if isinstance(payload, SearchFilter):
             payload = payload.get_payload()
-        payload.update({'bodyId': self.session.body_id,
-                        'levelOfDetail': level_of_detail,
-                        'flatten': True})
-        return self._get_paged_response("recordingFolderItemSearch", payload, "recordingFolderItem", 20, limit=limit)
+        if not (payload.keys() | options.keys()) & {'levelOfDetail', 'responseTemplate'}:
+            updates['levelOfDetail'] = self.level_of_detail
+        payload.update(updates)
+        return self._get_paged_response(req_type=search_type,
+                                        payload=payload,
+                                        target_array=result_type,
+                                        page_size=page_size,
+                                        limit=limit)
 
-    def recording_search(self, filt=None, level_of_detail="medium", limit=None):
-        payload = filt if filt is not None else {}
-        if isinstance(payload, SearchFilter):
-            payload = payload.get_payload()
-        payload.update({'bodyId': self.session.body_id,
-                        'levelOfDetail': level_of_detail,
-                        'state': ['inProgress', 'scheduled']})
-        return self._get_paged_response("recordingSearch", payload, "recording", 20, limit=limit)
+    def recording_folder_item_search(self, filt=None, page_size=20, limit=None):
+        return self._prepare_search(search_type="recordingFolderItemSearch",
+                                    result_type="recordingFolderItem",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id, 'flatten': True},
+                                    page_size=page_size,
+                                    limit=limit)
 
-    def offer_search(self, filt=None, level_of_detail="medium", limit=None):
-        payload = filt if filt is not None else {}
-        if isinstance(payload, SearchFilter):
-            payload = payload.get_payload()
-        payload['bodyId'] = self.session.body_id
-        payload['levelOfDetail'] = level_of_detail
-        return self._get_paged_response("offerSearch", payload, "offer", 20, limit=limit)
+    def recording_search(self, filt=None, page_size=20, limit=None):
+        return self._prepare_search(search_type="recordingSearch",
+                                    result_type="recording",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id, 'state': ['inProgress', 'scheduled']},
+                                    page_size=page_size,
+                                    limit=limit)
 
-    def content_search(self, filt=None, level_of_detail="medium", limit=None):
-        payload = filt if filt is not None else {}
-        if isinstance(payload, SearchFilter):
-            payload = payload.get_payload()
-        payload['bodyId'] = self.session.body_id
-        payload['levelOfDetail'] = level_of_detail
-        return self._get_paged_response("contentSearch", payload, "content", 20, limit=limit)
+    def offer_search(self, filt=None, page_size=20, limit=None):
+        return self._prepare_search(search_type="offerSearch",
+                                    result_type="offer",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id},
+                                    page_size=page_size,
+                                    limit=limit)
 
-    def collection_search(self, filt=None, level_of_detail="medium", limit=None):
-        payload = filt if filt is not None else {}
-        if isinstance(payload, SearchFilter):
-            payload = payload.get_payload()
-        payload['bodyId'] = self.session.body_id
-        payload['levelOfDetail'] = level_of_detail
-        payload['omitPgdImages'] = True
-        return self._get_paged_response("collectionSearch", payload, "collection", 20, limit=limit)
+    def content_search(self, filt=None, page_size=20, limit=None):
+        return self._prepare_search(search_type="contentSearch",
+                                    result_type="content",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id},
+                                    page_size=page_size,
+                                    limit=limit)
+
+    def collection_search(self, filt=None, page_size=20, limit=None):
+        return self._prepare_search(search_type="collectionSearch",
+                                    result_type="collection",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id, 'omitPgdImages': True},
+                                    page_size=page_size,
+                                    limit=limit)
 
     @staticmethod
     def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
