@@ -166,6 +166,12 @@ class Mind(object):
                                     page_size=page_size,
                                     limit=limit)
 
+    def send_key(self, key):
+        self.session.send_request('keyEventSend', {'event': key})
+        h, b = self.session.get_response()
+        return b
+
+
     @staticmethod
     def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
         mrpc = rpc.MRPCSession.new_session(cert_path=cert_path,
