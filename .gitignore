@@ -99,3 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# IDEs
+.idea/
+
+# Support info
+support/
