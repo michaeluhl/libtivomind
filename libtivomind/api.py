@@ -2,7 +2,7 @@ import copy
 import contextlib
 import threading
 
-import tivotalk.mind.rpc as rpc
+import libtivomind.rpc as rpc
 
 
 class SearchFilter(object):
