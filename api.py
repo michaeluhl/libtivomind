@@ -53,6 +53,9 @@ class SearchFilter(object):
             collection_id = collection_id['collectionId']
         self.dict['collectionId'] = collection_id
 
+    def by_station_id(self, station_id):
+        self.dict['stationId'] = station_id
+
     def order_by(self, sort_field):
         self.dict['orderBy'] = sort_field
 
@@ -125,6 +128,14 @@ class Mind(object):
                                         target_array=result_type,
                                         page_size=page_size,
                                         limit=limit)
+
+    def channel_search(self):
+        return self._prepare_search(search_type='channelSearch',
+                                    result_type='channel',
+                                    filt=None,
+                                    options={'bodyId': self.session.body_id, 'flatten': True, 'noLimit': True},
+                                    page_size=25,
+                                    limit=None)
 
     def recording_folder_item_search(self, filt=None, page_size=20, limit=None):
         return self._prepare_search(search_type="recordingFolderItemSearch",
