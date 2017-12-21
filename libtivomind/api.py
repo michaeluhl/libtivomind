@@ -106,7 +106,9 @@ class Mind(object):
         h, b = self.session.get_response()
         while target_array in b and len(b[target_array]) > 0:
             results.extend(b[target_array])
-            if (limit is not None and len(results) > limit) or ('isBottom' in b and b['isBottom']):
+            if ((limit is not None and len(results) > limit) or
+                    ('isBottom' in b and b['isBottom']) or
+                    ('isBottom' not in b)):
                 break
             if 'count' in payload:
                 del payload['count']
@@ -174,6 +176,15 @@ class Mind(object):
                                     result_type="collection",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id, 'omitPgdImages': True},
+                                    page_size=page_size,
+                                    limit=limit)
+
+    def category_search(self, filt=None, page_size=20, limit=None, top_level_only=False):
+        return self._prepare_search(search_type="categorySearch",
+                                    result_type="category",
+                                    filt=filt,
+                                    options={'bodyId': self.session.body_id,
+                                             'topLevelOnly': top_level_only},
                                     page_size=page_size,
                                     limit=limit)
 

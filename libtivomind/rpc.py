@@ -145,6 +145,7 @@ class MRPCSession(object):
         self.rpc_id += 1
 
         self.socket.sendall(request.encode('ascii'))
+        return self.rpc_id - 1
 
     @staticmethod
     def parse_headers(buffer):
