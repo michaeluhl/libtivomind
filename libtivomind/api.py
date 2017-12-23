@@ -1,8 +1,52 @@
 import copy
 import contextlib
+import enum
 import threading
 
 import libtivomind.rpc as rpc
+
+
+class RemoteKey(enum.Enum):
+    back = "back"
+    channelUp = "channelUp"
+    lab_channel = "lab_channel"
+    channelDown = "channelDown"
+    left = "left"
+    zoom = "zoom"
+    tivo = "tivo"
+    up = "up"
+    select = "select"
+    down = "down"
+    liveTv = "liveTv"
+    info = "info"
+    right = "right"
+    guide = "guide"
+    num1 = "num1"
+    num2 = "num2"
+    num3 = "num3"
+    num4 = "num4"
+    num5 = "num5"
+    num6 = "num6"
+    num7 = "num7"
+    num8 = "num8"
+    num9 = "num9"
+    clear = "clear"
+    num0 = "num0"
+    enter = "enter"
+    actionA = "actionA"
+    actionB = "actionB"
+    actionC = "actionC"
+    actionD = "actionD"
+    thumbsDown = "thumbsDown"
+    reverse = "reverse"
+    replay = "replay"
+    play = "play"
+    pause = "pause"
+    slow = "slow"
+    record = "record"
+    thumbsUp = "thumbsUp"
+    forward = "forward"
+    advance = "advance"
 
 
 class SearchFilter(object):
@@ -43,6 +87,11 @@ class SearchFilter(object):
         if max_utc_time:
             self.dict['maxEndTime'] = rpc.MRPCSession.get_date_string(max_utc_time)
 
+    def by_category_id(self, category_id):
+        if isinstance(category_id, dict):
+            category_id = category_id['categoryId']
+        self.dict['categoryId'] = category_id
+
     def by_content_id(self, content_id):
         if isinstance(content_id, dict):
             content_id = content_id['contentId']
@@ -52,6 +101,21 @@ class SearchFilter(object):
         if isinstance(collection_id, dict):
             collection_id = collection_id['collectionId']
         self.dict['collectionId'] = collection_id
+
+    def by_offer_id(self, offer_id):
+        if isinstance(offer_id, dict):
+            offer_id = offer_id['offerId']
+        self.dict['offerId'] = offer_id
+
+    def by_recording_id(self, recording_id):
+        if isinstance(recording_id, dict):
+            recording_id = recording_id['recordingId']
+        self.dict['recordingId'] = recording_id
+
+    def by_recording_folder_item_id(self, recording_folder_item_id):
+        if isinstance(recording_folder_item_id, dict):
+            recording_folder_item_id = recording_folder_item_id['recordingFolderItemId']
+        self.dict['recordingFolderItemId'] = recording_folder_item_id
 
     def by_station_id(self, station_id):
         self.dict['stationId'] = station_id
@@ -131,13 +195,13 @@ class Mind(object):
                                         page_size=page_size,
                                         limit=limit)
 
-    def channel_search(self):
+    def channel_search(self, filt=None, page_size=20, limit=None):
         return self._prepare_search(search_type='channelSearch',
                                     result_type='channel',
-                                    filt=None,
+                                    filt=filt,
                                     options={'bodyId': self.session.body_id, 'flatten': True, 'noLimit': True},
-                                    page_size=25,
-                                    limit=None)
+                                    page_size=page_size,
+                                    limit=limit)
 
     def recording_folder_item_search(self, filt=None, page_size=20, limit=None):
         return self._prepare_search(search_type="recordingFolderItemSearch",
@@ -188,8 +252,25 @@ class Mind(object):
                                     page_size=page_size,
                                     limit=limit)
 
-    def send_key(self, key):
-        self.session.send_request('keyEventSend', {'event': key})
+    def whats_on_search(self):
+        return self._prepare_search(search_type="whatsOnSearch",
+                                    result_type="whatsOn",
+                                    filt=None,
+                                    options={'bodyId': self.session.body_id})
+
+    def tuner_state(self):
+        return self._prepare_search(search_type="tunerStateEventRegister",
+                                    result_type="state",
+                                    filt=None,
+                                    options={'bodyId': self.session.body_id})
+
+    def send_key(self, key_event, value=None):
+        if value is None:
+            if isinstance(key_event, RemoteKey):
+                key_event = key_event.value
+            self.session.send_request('keyEventSend', {'event': key_event})
+        elif value is not None and key_event == 'ascii':
+            self.session.send_request('keyEventSend', {'event': 'ascii', 'value': value})
         h, b = self.session.get_response()
         return b
 
