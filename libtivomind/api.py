@@ -163,25 +163,22 @@ class Mind(object):
         self.session = session
         self.level_of_detail = level_of_detail
 
-    def _get_paged_response(self, req_type, payload, target_array, page_size=20, limit=None):
+    def _get_paged_response(self, req_type, payload, target_array, count=20, offset=0, fetch_all=False):
         results = []
-        payload['count'] = page_size
-        self.session.send_request(req_type, payload)
+        payload['count'] = count
+        payload['offset'] = offset
+        req_id = self.session.send_request(req_type, payload)
         h, b = self.session.get_response()
         while target_array in b and len(b[target_array]) > 0:
             results.extend(b[target_array])
-            if ((limit is not None and len(results) > limit) or
-                    ('isBottom' in b and b['isBottom']) or
-                    ('isBottom' not in b)):
+            if 'isBottom' not in b or b['isBottom'] or not fetch_all:
                 break
-            if 'count' in payload:
-                del payload['count']
             payload['offset'] = len(results)
-            self.session.send_request(req_type, payload)
+            req_id = self.session.send_request(req_type, payload)
             h, b = self.session.get_response()
         return results
 
-    def _prepare_search(self, search_type, result_type, filt=None, options=None, page_size=20, limit=None):
+    def _prepare_search(self, search_type, result_type, filt=None, options=None, count=20, offset=0, fetch_all=False):
         payload = filt if filt is not None else {}
         updates = options if options is not None and isinstance(options, dict) else {}
         if isinstance(payload, SearchFilter):
@@ -192,65 +189,73 @@ class Mind(object):
         return self._get_paged_response(req_type=search_type,
                                         payload=payload,
                                         target_array=result_type,
-                                        page_size=page_size,
-                                        limit=limit)
+                                        count=count,
+                                        offset=offset,
+                                        fetch_all=fetch_all)
 
-    def channel_search(self, filt=None, page_size=20, limit=None):
+    def channel_search(self, filt=None, count=20, offset=0, fetch_all=False, no_limit=False):
         return self._prepare_search(search_type='channelSearch',
                                     result_type='channel',
                                     filt=filt,
-                                    options={'bodyId': self.session.body_id, 'flatten': True, 'noLimit': True},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    options={'bodyId': self.session.body_id, 'flatten': True, 'noLimit': no_limit},
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def recording_folder_item_search(self, filt=None, page_size=20, limit=None):
+    def recording_folder_item_search(self, filt=None, count=20, offset=0, fetch_all=False):
         return self._prepare_search(search_type="recordingFolderItemSearch",
                                     result_type="recordingFolderItem",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id, 'flatten': True},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def recording_search(self, filt=None, page_size=20, limit=None):
+    def recording_search(self, filt=None, count=20, offset=0, fetch_all=False):
         return self._prepare_search(search_type="recordingSearch",
                                     result_type="recording",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id, 'state': ['inProgress', 'scheduled']},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def offer_search(self, filt=None, page_size=20, limit=None):
+    def offer_search(self, filt=None, count=20, offset=0, fetch_all=False):
         return self._prepare_search(search_type="offerSearch",
                                     result_type="offer",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def content_search(self, filt=None, page_size=20, limit=None):
+    def content_search(self, filt=None, count=20, offset=0, fetch_all=False):
         return self._prepare_search(search_type="contentSearch",
                                     result_type="content",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def collection_search(self, filt=None, page_size=20, limit=None):
+    def collection_search(self, filt=None, count=20, offset=0, fetch_all=False):
         return self._prepare_search(search_type="collectionSearch",
                                     result_type="collection",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id, 'omitPgdImages': True},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
-    def category_search(self, filt=None, page_size=20, limit=None, top_level_only=False):
+    def category_search(self, filt=None, count=20, offset=0, fetch_all=False, top_level_only=False):
         return self._prepare_search(search_type="categorySearch",
                                     result_type="category",
                                     filt=filt,
                                     options={'bodyId': self.session.body_id,
                                              'topLevelOnly': top_level_only},
-                                    page_size=page_size,
-                                    limit=limit)
+                                    count=count,
+                                    offset=offset,
+                                    fetch_all=fetch_all)
 
     def whats_on_search(self):
         return self._prepare_search(search_type="whatsOnSearch",
