@@ -168,14 +168,14 @@ class Mind(object):
         payload['count'] = count
         payload['offset'] = offset
         req_id = self.session.send_request(req_type, payload)
-        h, b = self.session.get_response()
+        h, b = self.session.get_response(req_id)
         while target_array in b and len(b[target_array]) > 0:
             results.extend(b[target_array])
             if 'isBottom' not in b or b['isBottom'] or not fetch_all:
                 break
             payload['offset'] = len(results)
             req_id = self.session.send_request(req_type, payload)
-            h, b = self.session.get_response()
+            h, b = self.session.get_response(req_id)
         return results
 
     def _prepare_search(self, search_type, result_type, filt=None, options=None, count=20, offset=0, fetch_all=False):
@@ -270,13 +270,14 @@ class Mind(object):
                                     options={'bodyId': self.session.body_id})
 
     def send_key(self, key_event, value=None):
+        req_id = None
         if value is None:
             if isinstance(key_event, RemoteKey):
                 key_event = key_event.value
-            self.session.send_request('keyEventSend', {'event': key_event})
+            req_id = self.session.send_request('keyEventSend', {'event': key_event})
         elif value is not None and key_event == 'ascii':
-            self.session.send_request('keyEventSend', {'event': 'ascii', 'value': value})
-        h, b = self.session.get_response()
+            req_id = self.session.send_request('keyEventSend', {'event': 'ascii', 'value': value})
+        h, b = self.session.get_response(req_id)
         return b
 
 

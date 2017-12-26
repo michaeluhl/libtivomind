@@ -1,3 +1,4 @@
+import collections
 import io
 import json
 import random
@@ -86,6 +87,7 @@ class MRPCSession(object):
         self.rpc_id = 0
         self.body_id = ""
         self.debug = debug
+        self.queue = collections.deque()
 
     def connect(self):
         self.socket = self.sm.get_socket()
@@ -151,7 +153,7 @@ class MRPCSession(object):
     def parse_headers(buffer):
         return dict([line.split(': ', 1) for line in buffer.split('\r\n') if len(line) > 0])
 
-    def get_response(self):
+    def __get_response(self):
         buffer = io.BytesIO()
         buffer.write(self.socket.recv())
         while b"\n" not in buffer.getvalue():
@@ -170,8 +172,21 @@ class MRPCSession(object):
                 print("RPC Response (Bytes Loaded: {:d})".format(buffer.tell() - h_start))
         buf_val = buffer.getvalue().decode()
         headers = self.parse_headers(buf_val[h_start:h_start+h_size])
+        if self.debug:
+            print("RPC Response ID: {}".format(headers['RpcId']))
         response_json = json.loads(buf_val[h_start+h_size:])
         return headers, response_json
+
+    def get_response(self, rpcid=None):
+        response = next((rsp for id, rsp in self.queue if id == rpcid or rpcid == None), None)
+        if response:
+            self.queue.remove((response[0]['RpcId'], response))
+            return response
+        headers, body = self.__get_response()
+        while int(headers['RpcId']) != rpcid and rpcid is not None:
+            self.queue.append((int(headers['RpcId']), (headers, body)))
+            headers, body = self.__get_response()
+        return headers, body
 
     def do_auth(self):
         self.send_request("bodyAuthenticate", self.credential.payload())
