@@ -120,6 +120,9 @@ class SearchFilter(object):
     def by_station_id(self, station_id):
         self.dict['stationId'] = station_id
 
+    def by_user_fields(self, field_values):
+        self.dict.update(field_values)
+
     def order_by(self, sort_field):
         self.dict['orderBy'] = sort_field
 
