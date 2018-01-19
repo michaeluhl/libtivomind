@@ -283,6 +283,11 @@ class Mind(object):
         h, b = self.session.get_response(req_id)
         return b
 
+    def change_channel(self, channel_id):
+        req_id = self.session.send_request('channelChange', {'channelId': channel_id})
+        h, b = self.session.get_response(req_id)
+        return b
+
 
     @staticmethod
     def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
