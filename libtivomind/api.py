@@ -288,6 +288,17 @@ class Mind(object):
         h, b = self.session.get_response(req_id)
         return b
 
+    def playback(self, recording_id, hide_banner=True):
+        """Initiate playback on the connected device.
+
+        Note that the required id is the childRecordingId of a recording folder item."""
+        req_id = self.session.send_request('uiNavigate', {'uri': 'x-tivo:classicui:playback',
+                                                          'parameters': {'fUseTrioId': True,
+                                                                         'recordingId': recording_id,
+                                                                         'fHideBannerOnEnter': hide_banner}
+                                                          })
+        h, b = self.session.get_response(req_id)
+        return b
 
     @staticmethod
     def new_session(cert_path, cert_password, address, credential, port=1413, debug=False):
